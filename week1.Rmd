@@ -1,0 +1,229 @@
+---
+title: "Week 1"
+output: html_document
+date: "2024-01-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## how to compute distance 
+
+The data represent RNA expression levels for eight tissues, each with several individuals.
+```{r }
+library(tissuesGeneExpression)
+data(tissuesGeneExpression)
+table(tissue)
+```
+```{r }
+x <- e[,1]#first sample 
+y <- e[,2]#second sample 
+z <- e[,87]#third sample 
+tissue[c(1,2,87)] #see what tissue are
+```
+
+we expect first and second close to each other because they are kidney tissues
+```{r }
+sqrt(sum((x-y)^2))
+sqrt(sum((x-z)^2))
+```
+
+below should give use same answers
+```{r }
+sqrt(crossprod(x-y))
+sqrt(crossprod(x-z))
+```
+another way
+```{r }
+d <- dist(t(e))
+as.matrix(d)[1,2]
+as.matrix(d)[1,87]
+```
+
+```{r }
+image(as.matrix(d))
+```
+## Distance Exercises
+
+## Distance Exercises #1
+
+```{r }
+library(devtools)
+install_github("genomicsclass/tissuesGeneExpression")
+```
+The data represents RNA expression levels for seven tissues, each with several biological replicates. We call samples that we consider to be from the same population, such as liver tissue from different individuals, biological replicates:
+```{r }
+library(tissuesGeneExpression)
+data(tissuesGeneExpression)
+#head(e)
+#head(tissue)
+```
+
+How many biological replicates are there for hippocampus?
+```{r }
+table(tissue)
+```
+## Distance Exercises #2
+
+What is the distance between samples 3 and 45?
+```{r }
+d <- dist(t(e))
+as.matrix(d)[3,45]
+#or
+#sqrt( crossprod(e[,3]-e[,45]) )
+```
+
+## Distance Exercises #3
+
+What is the distance between gene 210486_at and 200805_at?
+```{r }
+x <- e['210486_at',] 
+y <- e['200805_at',] 
+sqrt(crossprod(x-y))
+```
+
+## Distance Exercises #4
+
+If I run the command d = as.matrix(dist(e))
+How many cells (number of rows times number of columns) would this matrix have?
+```{r }
+nrow(e)^2
+```
+
+## Distance Exercises #5
+
+Compute the distance between all pairs of samples:
+How many distances are stored in d? (Hint: What is the length of d)?
+```{r }
+d = dist(t(e))
+length(d)
+```
+
+## Quiz
+
+```{r }
+library(GSE5859Subset)
+data(GSE5859Subset)
+```
+
+## Question 1
+Inspect the dimensions of the geneExpression matrix.
+
+A: How many samples are in the dataset?
+```{r }
+d <- dim(geneExpression)
+d[2]
+```
+B: How many features are in the dataset?
+```{r }
+d[1]
+```
+
+## Question 2
+
+Inspect the sampleInfo data frame.
+
+A: How many samples are from the ethnicity "ASN"?
+```{r }
+sum(sampleInfo$ethnicity == "ASN")
+```
+B: Which sample is from the ethnicity "CEU"?
+```{r }
+which(sampleInfo$ethnicity == "CEU")
+```
+## Question 3
+
+Return to the geneExpression matrix for this question.
+
+A: What is the distance between samples 3 and 7?
+```{r }
+x <- geneExpression[,3]
+y <- geneExpression[,7]
+sqrt(sum((x-y)^2))
+```
+
+B: What is the distance between samples 4 and 14?
+```{r }
+x <- geneExpression[,4]
+y <- geneExpression[,14]
+sqrt(sum((x-y)^2))
+```
+
+## Question 4
+
+This code finds the mean distance between the first sample (column 1) and all other samples:
+```{r }
+column = 1
+x = 1:ncol(geneExpression)
+dists = sapply(x, function(x){
+    test = geneExpression[,x]
+    target = geneExpression[,column]
+    sqrt(crossprod(target-test))
+})
+mean(dists)
+```
+
+Add an extra sapply() loop to this code to check the mean distance between each sample (column) and all other samples.
+
+Which sample (column) has the largest mean distance from other samples?
+```{r }
+columns = 1:ncol(geneExpression)
+mean_dists = sapply(columns, function(column){
+  dists = sapply(x, function(x){
+    test = geneExpression[,x]
+    target = geneExpression[,column]
+    sqrt(crossprod(target-test))
+  })
+mean(dists)
+})
+which.max(mean_dists)
+```
+
+## Question 5
+
+Use dist() to calculate the distance between all pairs of samples.
+
+What is the maximum distance between any two samples?
+```{r }
+distance <- dist(t(geneExpression))
+max(distance)
+```
+
+## Question 6
+A: What is the distance between features "1007_s_at" and "201371_s_at"?
+```{r }
+x <- geneExpression['1007_s_at',]
+y <- geneExpression['201371_s_at',]
+sqrt(sum((x-y)^2))
+#another way
+#sqrt(crossprod(geneExpression["1007_s_at",]-geneExpression["201371_s_at",]))
+
+```
+B: What is the distance between features "202138_x_at" and "202152_x_at"?
+```{r }
+x <- geneExpression['202138_x_at',]
+y <- geneExpression['202152_x_at',]
+sqrt(sum((x-y)^2))
+```
+
+## Question 7
+Use dist() to calculate the distance between all pairs of features.
+
+What is the maximum distance between any two features?
+```{r }
+distance <- dist(geneExpression)
+max(distance)
+```
+
+```{r }
+
+```
+
+```{r }
+
+```
+
+```{r }
+
+```
