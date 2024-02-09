@@ -1,0 +1,103 @@
+---
+title: "Week 2 quiz"
+output: html_document
+date: "2024-02-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 2
+
+```{r }
+library(GSE5859Subset)
+data(GSE5859Subset)
+```
+
+Compute the SVD of geneExpression. Save it as the variable s.
+A: What is the first entry of s$d?
+```{r }
+s <- svd(geneExpression)
+s1 <- s$d[1]
+s1
+```
+B: The proportion of variabiilty in the data explained by the xth column of U is equal to s$d[x]^2 divided by the sum of all s$d values. What proportion of variability is explained by the first column of U?
+```{r }
+U <- s$d[1]^2/ sum(s$d^2)
+U
+```
+C: Compute the mean of each row of geneExpression as a vector m. What is the correlation between m and the first column of s$u?
+```{r }
+m <- rowMeans(geneExpression)
+cor(m,s$u[,1])
+```
+
+## Question 4
+
+Define y as geneExpression - rowMeans(geneExpression), then compute the SVD of y and save the result as s.
+
+A: What is the first entry of s$d?
+```{r }
+y <- geneExpression - rowMeans(geneExpression)
+s <- svd(y)
+s$d[1]
+```
+B: What proportion of variability is explained by the first column of U ?
+```{r }
+U <- s$d[1]^2/ sum(s$d^2)
+U
+```
+C: Calculate the proportion of variability explained by each column of U. How many individual columns explain more than 5% of the variability?
+```{r }
+variability_proportion <- (s$d^2) / sum(s$d^2)
+sum(variability_proportion > 0.05)
+```
+D: What percent of variability is explained by the first 10 rows of U? Please enter in proportion terms; if your answer is 25%, then enter .25 here.
+```{r }
+per_10 <- sum(s$d[1:10]^2) / sum(s$d^2)
+per_10
+```
+
+## Question 5
+
+```{r }
+s <- svd(geneExpression)
+y2 <- s$u %*% diag(s$d) %*% t(s$v)
+residuals <- geneExpression - y2
+max(abs(residuals))
+```
+
+## Question 6
+
+Let z = s$d * t(s$v). Compare the distance between columns 1 and 2 in geneExpression (the original matrix), y (the de-trended matrix with row means subtracted), and z.
+
+A: What is the distance between columns 1 and 2 in geneExpression?
+```{r }
+sqrt(crossprod(geneExpression[,1]-geneExpression[,2]))
+```
+
+B: What is the distance between columns 1 and 2 in y?
+```{r }
+sqrt(crossprod(y[,1]-y[,2]))
+```
+C: What is the distance between columns 1 and 2 in z?
+```{r }
+z = s$d * t(s$v)
+sqrt(crossprod(z[,1]-z[,2]))
+```
+D: What is the distance between columns 1 and 2 in z using only the first 10 rows as an approximation?
+```{r }
+sqrt(crossprod(z[1:10,1]-z[1:10,2]))
+```
+
+## Question 7
+Perform MDS on the original geneExpression data:
+
+```{r }
+d = dist(t(geneExpression))
+mds = cmdscale(d)
+fdate = factor(sampleInfo$date)
+plot(mds[,1], mds[,2], col = fdate)
+legend("topright",levels(fdate),col=seq_along(fdate),pch=1)
+```
