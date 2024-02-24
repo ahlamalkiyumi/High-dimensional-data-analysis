@@ -1,0 +1,224 @@
+---
+title: "Week 4 quiz"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 
+
+The bladderbatch dataset from Bioconductor is a collection of gene expression data on bladder cancers from 5 different batches.
+```{r }
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+
+#BiocManager::install("bladderbatch")
+
+library(bladderbatch)
+data(bladderdata)
+
+# Get the expression data
+edata = exprs(bladderEset)
+# Get the pheno data
+pheno = pData(bladderEset)
+```
+
+Create a reduced dataset containing only batches 1-3. Save the subsetted expression data as expr and save the subsetted sample data as pdata:
+```{r }
+ind = which(pheno$batch %in% 1:3)
+#subset expression data
+expr = edata[,ind]
+#subset pheno data and redefine factor levels
+pdata = data.frame(batch=factor(pheno$batch[ind]),
+                   cancer = factor(pheno$cancer[ind]))
+```
+
+## Question 1
+Make a table of cancer status by batch.
+
+Which of the following are true?
+```{r }
+table(pdata$batch, pdata$cancer)
+```
+## Question 2
+Compare gene expression in the normal samples from batches 2 and 3. Use this code to extract the relevant subset of the data:
+```{r }
+index = which(pdata$cancer == "Normal")
+expr_norm = edata[ ,index]
+batch_norm = factor(pdata$batch[index])
+```
+
+Use rowttests() from the genefilter package to compare expression across the two batches and extract p-values. Then use the qvalue() function from the qvalue package to obtain q-values for each gene.
+
+What proportion of genes have an FDR less than 0.05 when comparing normal samples across batches?
+```{r }
+library(qvalue)
+library(genefilter)
+pval = rowttests(expr_norm, batch_norm)$p.value
+qval = qvalue(pval)$qvalue
+mean(qval < 0.05)
+```
+Under the null hypothesis, there should be no significant gene expression differences between normal samples. However, nearly 50% of the genes appear differentially expressed across batches. Batch appears to be a confounding variable.
+
+## Question 3
+
+Use rowttests() from the genefilter library to find which genes in expr appear to be differentially expressed between cancer and normal samples. Do not include batch effects. Then use the qvalue() function from the qvalue package to obtain q-values for each gene.
+
+What proportion of genes appear differentially expressed between cancer and normal samples at an q-value cutoff of 0.05?
+```{r }
+library(qvalue)
+library(genefilter)
+pval = rowttests(expr, pdata$cancer)$p.value
+qval = qvalue(pval)$qvalue
+mean(qval < 0.05)
+```
+The data suggest over 60% of the genes are differentially expressed. Even for a strong phenotype like cancer, this seems excessive.
+
+##Question 4
+
+The pdata sample information associated with this experiment includes a variable batch. It is not immediately clear what these batches represent, whether they include all the major sources of experimental variability, and whether they will be useful for improving interpreation of the data.
+
+Define a model matrix X that includes both cancer status and batch as variables.
+
+Which of these commands correctly defines X?
+```{r }
+X = model.matrix(~pdata$cancer + pdata$batch)
+```
+
+## Question 5
+Now use the model matrix X defined above to fit a regression model using lm() for each gene. Note that you can obtain p-values for estimated parameters using summary(). Here is an example for the first gene:
+
+```{r }
+i = 1
+y = expr[i,]
+fit = lm(y~X-1)
+summary(fit)$coef
+```
+Find the p-value (Pr(>|t|)) for the expression difference between cancer and normal samples for each gene. You can do this by modifying the example code above and using sapply(). Then use the qvalue() function from the qvalue package to obtain q-values for each gene.
+
+A. What proportion of genes appear to be differentially expressed between cancer and normal samples at a q-value cutoff of 0.05 when including batch in the model matrix?
+```{r }
+pvals_cancer = sapply(1:nrow(expr),function(i){
+    y = expr[i,]
+    fit = lm(y~X-1) 
+    summary(fit)$coef[2,4]
+})
+
+qvals_cancer = qvalue(pvals_cancer)$qvalue
+mean(qvals_cancer < 0.05)
+```
+
+B. What proportion of genes appear to be differentially expressed between batch 1 and batch 2?
+```{r }
+pvals_1v2 = sapply(1:nrow(expr),function(i){
+    y = expr[i,]
+    fit = lm(y~X-1) 
+    summary(fit)$coef[3,4]
+})
+
+qvals_1v2 = qvalue(pvals_1v2)$qvalue
+mean(qvals_1v2 < 0.05)
+```
+
+C. What proportion of genes appear to be differentially expressed between batch 1 and batch 3?
+```{r }
+pvals_1v3 = sapply(1:nrow(expr),function(i){
+    y = expr[i,]
+    fit = lm(y~X-1) 
+    summary(fit)$coef[4,4]
+})
+
+qvals_1v3 = qvalue(pvals_1v3)$qvalue
+mean(qvals_1v3 < 0.05)
+```
+
+## Question 6
+
+Subtract the average expression of each gene from expr and save these results as y:
+```{r }
+y = expr - rowMeans(expr)
+```
+
+Use the svd() function to obtain the principal components (PCs) for our detrended gene expression data y.
+
+How many principal components (PCs) explain more than 5% each of the variability?
+```{r }
+s <- svd(y)
+varex = s$d^2 / sum(s$d^2)
+plot(varex)
+sum(varex > 0.05)
+```
+## Question 7
+Plot the first 2 principal components on the x and y axis respectively. Try coloring the points by either cancer status or batch number.
+
+Which of the following are true?
+```{r }
+pcs = s$v[,1:2]
+library(rafalib)
+mypar(1,2)
+plot(pcs[,1], pcs[,2], col=pdata$cancer)
+legend("topleft", legend=levels(pdata$cancer), pch=1, col=1:2)
+plot(pcs[,1], pcs[,2], col=pdata$batch)
+legend("topleft", legend=levels(pdata$batch), pch=1, col=1:3)
+```
+A:Normal samples tend to have lower values of PC1 compared to cancer samples.
+A:Samples with high values of PC1 and high values of PC2 tend to be in batch 1
+
+## Question 8
+What is the absolute value of the correlation coefficient between the first principal component and cancer status?
+```{r }
+pc1 = s$v[,1]
+y = as.numeric(pdata$cancer)
+abs(cor(pc1,y))
+#another way
+#abs(cor(pcs[,1], pdata$cancer=="Cancer"))
+```
+
+## Question 9
+Load the sva library and use it to infer the surrogate variables in expr other than cancer status.
+
+Define mod as a model matrix including cancer status as a variable. Do not include batch as a variable - we will infer the batch effects with this approach. Then, use sva() to estimate the surrogate variables and store the output as sv.
+
+How many significant surrogate variables affect the data?
+```{r }
+library(sva)
+mod = model.matrix(~cancer, data=pdata)
+sv = sva(expr, mod)
+sv$n.sv
+```
+
+## Question 10
+
+Define mod0 as a null model matrix:
+```{r }
+mod0 = model.matrix(~1, data=pdata)
+```
+
+The f.pvalue() function from sva quickly calculates p-values for each gene (row) given a design matrix mod with the variable of interest and a null matrix mod0 that contains all variables except the variable of interest:
+```{r }
+fpvals = f.pvalue(expr, mod, mod0)
+```
+
+Note that the q-values from this function are the same as the results from using rowttests() in question 3:
+```{r }
+fqvals = qvalue(fpvals)$qvalue
+mean(fqvals < 0.05)
+```
+
+Now, alter the alternative and null model matrices to adjust for the surrogate variables:
+```{r }
+dSv = cbind(mod,sv$sv)
+mod0Sv = cbind(mod0,sv$sv)
+```
+
+Use f.pvalue() to calculate p-values for each gene given these new model matrices.
+
+After adjusting for surrogate variables, what proportion of genes have a q-value below 0.05?
+```{r }
+fpvals = f.pvalue(expr, dSv, mod0Sv)
+fqvals = qvalue(fpvals)$qvalue
+mean(fqvals < 0.05)
+```
+

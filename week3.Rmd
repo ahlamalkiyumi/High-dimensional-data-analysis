@@ -1,0 +1,572 @@
+---
+title: "Week 3"
+output: html_document
+date: "2024-02-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Clustering
+
+```{r}
+library(tissuesGeneExpression)
+data(tissuesGeneExpression)
+```
+
+## Dendrogram
+
+```{r}
+d <- dist(t(e))
+library(rafalib)
+mypar()
+hc <- hclust(d)
+hc
+plot(hc,labels=tissue,cex=0.5)
+```
+Color the groups 
+```{r}
+myplclust(hc, labels=tissue, lab.col=as.fumeric(tissue), cex=0.5)
+```
+## Hierarchical Clustering Exercises #1
+
+Create a random matrix with no correlation in the following way:
+```{r}
+set.seed(1)
+m = 10000
+n = 24
+x = matrix(rnorm(m*n),m,n)
+colnames(x)=1:n
+```
+Run hierarchical clustering on this data with the hclust() function with default parameters to cluster the columns. Create a dendrogram.
+
+From the dendrogram which pairs of samples are the furthest away from each other?
+```{r}
+d <- dist(t(x))
+hc <- hclust(d)
+plot(hc)
+```
+## Hierarchical Clustering Exercises #2
+
+Set the seed at 1 with set.seed(1) and replicate the creation of this matrix 100 times:
+```{r}
+m = 10000
+n = 24
+x = matrix(rnorm(m*n),m,n)
+```
+
+then perform hierarchical clustering as in the solution to question 2.4.1 and find the number of clusters if you use cutree() at height 143. Note that this number is a random variable.
+
+Based on the Monte Carlo simulation, what is the population standard deviation of this random variable?
+```{r}
+set.seed(1)
+m = 10000
+n = 24
+nc = replicate(100,{
+x = matrix(rnorm(m*n),m,n)
+hc = hclust( dist( t(x)))
+length(unique(cutree(hc,h=143)))
+})
+plot(table(nc)) ## look at the distribution
+popsd(nc)
+```
+
+```{r}
+popsd(nc)
+```
+
+## K-means clustring
+
+```{r}
+set.seed(1)
+km <- kmeans(t(e[1:2,]), centers=7)
+names(km)
+
+mypar(1,2)
+plot(e[1,], e[2,], col=as.fumeric(tissue), pch=16)
+plot(e[1,], e[2,], col=km$cluster, pch=16)
+```
+In the first plot, color represents the actual tissues, while in the second, color represents the clusters that were defined by `kmeans`. We can see from tabulating the results that this particular clustering exercise did not perform well:
+
+```{r}
+table(true=tissue,cluster=km$cluster)
+```
+This is very likely due to the fact that the first two genes are not informative regarding tissue type. We can see this in the first plot above. If we instead perform k-means clustering using all of the genes, we obtain a much improved result. To visualize this, we can use an MDS plot:
+
+```{r}
+km <- kmeans(t(e), centers=7)
+mds <- cmdscale(d)
+
+mypar(1,2)
+plot(mds[,1], mds[,2]) 
+plot(mds[,1], mds[,2], col=km$cluster, pch=16)
+```
+
+## K-means Exercises #1
+Run kmeans() with 5 centers for the blood RNA data:
+```{r}
+library(GSE5859Subset)
+data(GSE5859Subset)
+```
+
+Set the seed to 10, set.seed(10), right before running kmeans() with 5 centers.
+
+Explore the relationship of clusters and information in sampleInfo. Which of the following best describes what you find:
+```{r}
+mds=cmdscale(dist(t(geneExpression)))
+set.seed(10)
+result=kmeans(t(geneExpression),5)
+mypar(1,1)
+plot(mds,bg=result$cl,pch=21)
+table(sampleInfo$group,result$cluster)
+table(sampleInfo$date,result$cluster)
+##looks better if we re-order:
+table(sampleInfo$date,result$cluster)[,c(4,1,5,3,2)]
+
+```
+A: Date is driving the clusters
+
+## Heat Maps 
+because we have a lot of data, we will take only the top 4 genes that varies the most
+```{r}
+library(genefilter)
+rv <- rowVars(e)
+idx <- order(-rv)[1:48]
+heatmap(e[idx,])
+```
+
+## Heat Maps Exercises
+Pick the 25 genes with the highest across sample variance. This function might help
+```{r}
+install.packages("matrixStats")
+library(matrixStats)
+?rowMads ##we use mads due to a outlier sample
+```
+While a heatmap function is included in R, we recommend the heatmap.2 function from the gplots package on CRAN because it is a bit more customized. For example, it stretches to fill the window.
+```{r}
+#install.packages("gplots")
+library(gplots)
+```
+Use heatmap.2() to make a heatmap showing the sampleInfo$group with color, the date as labels, the rows labelled with chromosome, and scaling the rows.
+
+What do we learn from this heatmap?
+```{r}
+##load libraries
+library(rafalib)
+library(gplots)
+library(matrixStats)
+library(RColorBrewer)
+##make colors
+cols = colorRampPalette(rev(brewer.pal(11,"RdBu")))(25)
+gcol=brewer.pal(3,"Dark2")
+gcol=gcol[sampleInfo$g+1]
+
+##make lables: remove 2005 since it's common to all
+labcol= gsub("2005-","",sampleInfo$date)  
+
+##pick highly variable genes:
+sds =rowMads(geneExpression)
+ind = order(sds,decreasing=TRUE)[1:25]
+
+## make heatmap
+heatmap.2(geneExpression[ind,],
+          col=cols,
+          trace="none",
+          scale="row",
+          labRow=geneAnnotation$CHR[ind],
+          labCol=labcol,
+          ColSideColors=gcol,
+          key=FALSE)
+```
+A: A group of chrY genes are higher in group 0 and appear to drive the clustering. Within those clusters there appears to be clustering by month.
+
+## Heat Maps Exercises #2
+Create a large data set of random data that is completely independent of sampleInfo$group like this:
+```{r}
+set.seed(17)
+m = nrow(geneExpression)
+n = ncol(geneExpression)
+x = matrix(rnorm(m*n),m,n)
+g = factor(sampleInfo$g )
+```
+
+Create two heatmaps with these data. Show the group g either with labels or colors.
+
+1. Taking the 50 genes with smallest p-values obtained with rowttests
+
+2. Taking the 50 genes with largest standard deviations.
+
+Which of the following statements is true:
+```{r}
+library(gplots)
+library(matrixStats)
+library(genefilter)
+library(RColorBrewer)
+cols = colorRampPalette(rev(brewer.pal(11,"RdBu")))(25)
+
+ttest = rowttests(x,g)
+sds = rowSds(x)
+Indexes = list(t=order(ttest$p.value)[1:50], s=order(-sds)[1:50])
+for(ind in Indexes){
+ heatmap.2(x[ind,],
+          col=cols,
+          trace="none",
+          scale="row",
+          labCol=g,
+          key=FALSE)
+}
+```
+A: There is no relationship between g and x but with 8,793 tests some will appear significant by chance. Selecting genes with the t-test gives us a deceiving result.
+
+## Conditional Expectations
+
+Throughout this assessment it will be useful to remember that when our data are 0s and 1s, probabilities and expectations are the same thing. We can do the math, but here is an example in the form of R code:
+```{r}
+n = 1000
+y = rbinom(n,1,0.25)
+##proportion of ones Pr(Y)
+sum(y==1)/length(y)
+##expectaion of Y
+mean(y)
+```
+
+## Conditional Expectation Exercises #1
+Generate some random data to imitate heights for men (0) and women (1):
+```{r}
+n = 10000
+set.seed(1)
+men = rnorm(n,176,7) # h in cm
+women = rnorm(n,162,7)
+y = c(rep(0,n),rep(1,n))
+x = round(c(men,women))
+##mix it up
+ind = sample(seq(along=y))
+y = y[ind]
+x = x[ind]
+```
+
+Treating the data generated above as the population, if we know someone is 176 cm tall, what it the probability that this person is a woman: Pr(Y =1|X=176) = E(Y|X = 176) ?
+```{r}
+mean(y[x==176])
+```
+
+## Conditional Expectation Exercises #2
+
+Now make a plot of E(Y|X = x) for x=seq(160,178) using the data generated in Conditional Expectation Exercises #1.
+
+Suppose for each height x you predict 1 (female) if Pr(Y|X = x) > 0.5 and 0 (male) otherwise. What is the largest height for which you predict female ?
+```{r}
+xs <- seq(160,178)
+b <- vector('double', length(xs))
+for (i in seq_along(xs)) {
+  b[[i]] <- mean(y[x==xs[[i]]])
+}
+c <- max(which(b > 0.5))
+xs[c]
+```
+
+```{r}
+xs = seq(160,178)
+pr =sapply(xs,function(x0) mean(y[x==x0]))
+plot(xs,pr)
+abline(h=0.5)
+abline(v=168)
+```
+
+## Smoothing Exercises
+
+Make sure that you are using the correct random number generator (RNG) settings by calling the following command:
+```{r}
+RNGkind("Mersenne-Twister", "Inversion", "Rounding")
+```
+
+## Smoothing Exercises #1
+Use the data generated in a previous question about men's and women's heights:
+```{r}
+n = 10000
+set.seed(1)
+men = rnorm(n,176,7) #height in centimeters
+women = rnorm(n,162,7) #height in centimeters
+y = c(rep(0,n),rep(1,n))
+x = round(c(men,women))
+##mix it up
+ind = sample(seq(along=y))
+y = y[ind]
+x = x[ind]
+```
+
+Set the seed at 5, set.seed(5), and take a random sample of 250 individuals from the population like this:
+```{r}
+set.seed(5)
+N = 250
+ind = sample(length(y),N)
+Y = y[ind]
+X = x[ind]
+```
+
+Use loess() to estimate f(x) = E(Y|X = x) using the default parameters. What is the predicted f(168)?
+```{r}
+fit=loess(Y~X)
+predict(fit,newdata=data.frame(X=168))
+
+##Here is a plot
+xs = seq(160,178)
+Pr =sapply(xs,function(x0) mean(Y[X==x0]))
+plot(xs,Pr)
+fitted=predict(fit,newdata=data.frame(X=xs))
+lines(xs,fitted)
+```
+
+## Smoothing Exercises #2
+
+The loess estimate above is a random variable thus we can estimate its standard deviation. Use Monte Carlo simulation to compute the standard deviation of your estimate of f(168) (remember, we have the entire population ).
+
+Set the seed to 5 with set.seed(5) and perform 1000 simulations of the computations performed in question #1. Report the the population standard deviation of the loess based estimate.
+```{r}
+set.seed(5)
+B <- 1000
+estimate = rep(NA, B)
+for (i in 1:B) {
+  N = 250
+  ind = sample(length(y), N)
+  Y = y[ind]
+  X = x[ind]
+  fit = loess(Y~X)
+  estimate[i] = predict(fit,newdata=data.frame(X=168))
+}
+popsd(estimate)
+```
+
+## Machine Learning 
+we will predict tissues bases on gene expression data
+```{r}
+library(tissuesGeneExpression)
+data(tissuesGeneExpression)
+```
+
+```{r}
+table(tissue)
+ind <- which(tissue != "placenta")
+y <- tissue[ind]
+X <- t( e[,ind] )
+```
+ create a set of indices that facilitates cross validation
+```{r}
+#install.packages("caret")
+library(caret)
+set.seed(1)
+idx <- createFolds(y, k=5)
+sapply(idx, function(i) table(y[i]))
+```
+```{r}
+Xsmall <- cmdscale(dist(X))
+library(rafalib)
+mypar(1,1)
+plot(Xsmall,col=as.fumeric(y))
+legend("topleft",levels(factor(y)),fill=seq_along(levels(factor(y))))
+```
+
+apply KNN. we will train in all rows except the first one and test on the remaining dataset
+```{r}
+library(class)
+i=1
+pred <- knn(train=Xsmall[ -idx[[1]] , ],
+            test=Xsmall[ idx[[1]], ],
+            cl=y[ -idx[[1]] ], k=5)
+table(true=y[ idx[[1]] ], pred)
+mean(y[ idx[[1]] ] != pred) #how many mistakes we made 
+```
+doing the training in all five folds 
+```{r}
+set.seed(1)
+k <- 5
+res.k <- sapply(seq_along(idx), function(i) {
+  # loop over the 5 coross validation folds
+  
+  #predict the held-out samples using kNN
+  pred <- knn(train=Xsmall[ -idx[[1]] , ],
+            test=Xsmall[ idx[[1]], ],
+            cl=y[ -idx[[1]] ], k=k)
+  # the ratio of misclassification samples
+  sum(y[ idx[[i]] ] != pred)
+})
+res.k # this to check how many mistakes we made in each fold
+```
+compare the different k
+```{r}
+set.seed(1)
+ks <- 1:12
+res <- sapply(ks,function(k){
+res.k <- sapply(seq_along(idx), function(i) {
+  # loop over the 5 coross validation folds
+  
+  #predict the held-out samples using kNN
+  pred <- knn(train=Xsmall[ -idx[[1]] , ],
+            test=Xsmall[ idx[[1]], ],
+            cl=y[ -idx[[1]] ], k=k)
+  # the ratio of misclassification samples
+  sum(y[ idx[[i]] ] != pred)
+})
+sum(res.k)/length(y)
+})
+```
+
+```{r}
+plot(ks,res)
+```
+
+## kNN and Cross Validation Exercises
+
+Changes in R since the creation of this material have altered the randomization code. You will need to include the following line in your code before you call set.seed(N) in order to obtain the correct answers:
+```{r}
+RNGkind(sample.kind = "Rounding")
+```
+
+Load the following dataset:
+```{r}
+library(GSE5859Subset)
+data(GSE5859Subset)
+```
+
+And define the outcome and predictors. To make the problem more difficult, we will only consider autosomal genes:
+```{r}
+y = factor(sampleInfo$group)
+X = t(geneExpression)
+out = which(geneAnnotation$CHR%in%c("chrX","chrY"))
+X = X[,-out]
+```
+
+```{r}
+library(caret)
+```
+
+## kNN and Cross Validation Exercises #1
+Set the seed to 1, set.seed(1), then use the createFolds() function in the caret package to create 10 folds of y.
+
+What is the 2nd entry in the fold 3?
+```{r}
+set.seed(1)
+idx = createFolds(y,k=10)
+idx[[3]][2]
+```
+
+## kNN and Cross Validation Exercises #2
+For the following questions we are going to use kNN. We are going to consider a smaller set of predictors by filtering genes using t-tests. Specifically, we will perform a t-test and select the m genes with the smallest p-values.
+
+Let m=8 and k=5 and train kNN by leaving out the second fold, idx[[2]].
+
+How many mistakes do we make on the test set? Remember it is indispensable that you perform the ttest on the training data.
+```{r}
+library(class)
+library(genefilter)
+m = 8
+k = 5
+ind = idx[[2]]
+pvals = rowttests(t(X[-ind,]),factor(y[-ind]))$p.val
+ind2 = order(pvals)[1:m]
+predict=knn(X[-ind,ind2],X[ind,ind2],y[-ind],k=k)
+sum(predict!=y[ind])
+```
+
+## kNN and Cross Validation Exercises #3
+Now run the code for kNN and Cross Validation Exercises #2 for all 10 folds and keep track of the errors. What is our error rate (number of errors divided by number of predictions) ?
+```{r}
+library(class)
+library(genefilter)
+m=8
+k=5
+result = sapply(idx,function(ind){
+  pvals = rowttests(t(X[-ind,]),factor(y[-ind]))$p.val
+  ind2 = order(pvals)[1:m]
+  predict=knn(X[-ind,ind2],X[ind,ind2],y[-ind],k=k)
+  sum(predict!=y[ind])
+})
+sum(result)/length(y)
+```
+
+## kNN and Cross Validation Exercises #4
+Now we are going to select the best values of k and m. Use the expand.grid() function to try out the following values:
+```{r}
+ms= 2^c(1:11)
+ks=seq(1,9,2)
+params = expand.grid(k=ks,m=ms)
+```
+Now use sapply() or a for loop to obtain error rates for each of these pairs of parameters. Which pair of parameters minimizes the error rate?
+```{r}
+errors = apply(params,1,function(param){
+  k = param[1]
+  m = param[2]
+  result = sapply(idx,function(ind){
+    pvals = rowttests(t(X[-ind,]),factor(y[-ind]))$p.val
+    ind2 = order(pvals)[1:m]
+    predict=knn(X[-ind,ind2],X[ind,ind2],y[-ind],k=k)
+    sum(predict!=y[ind])
+  })
+  sum(result)/length(y)
+})
+params[which.min(errors),]
+##make a plot and confirm its just one min:
+errors = matrix(errors,5,11)
+library(rafalib)
+mypar(1,1)
+matplot(ms,t(errors),type="l",log="x")
+legend("topright",as.character(ks),lty=seq_along(ks),col=seq_along(ks))
+```
+
+## kNN and Cross Validation Exercises #5
+Repeat question kNN and Cross Validation Exercises #4 but now perform the t-test filtering before the cross validation. Note how this biases the entire result and gives us much lower estimated error rates.
+What is the minimum error rate?
+```{r}
+pvals = rowttests(t(X),factor(y))$p.val
+errors = apply(params,1,function(param){
+  k =  param[1]
+  m =  param[2]
+  result = sapply(idx,function(ind){
+    ind2 = order(pvals)[1:m]
+    predict=knn(X[-ind,ind2],X[ind,ind2],y[-ind],k=k)
+    sum(predict!=y[ind])
+  })
+  sum(result)/length(y)
+  })
+min(errors)
+##make a plot and compare to previous question
+errors = matrix(errors,5,11)
+library(rafalib)
+mypar(1,1)
+matplot(ms,t(errors),type="l",log="x")
+legend("topright",as.character(ks),lty=seq_along(ks),col=seq_along(ks))
+```
+Note how this biases the entire result and gives us much lower estimated error rates. The filtering must be applied without the test set data.
+
+## kNN and Cross Validation Exercises #6
+Repeat the cross-validation we performed in question kNN and Cross Validation Exercises #4, but now instead of defining y as sampleInfo$group, use:
+```{r}
+y = factor(as.numeric(format( sampleInfo$date, "%m")=="06"))
+```
+
+What is the minimum error rate now?
+```{r}
+errors = apply(params,1,function(param){
+  k =  param[1]
+  m =  param[2]
+  result = sapply(idx,function(ind){
+    pvals = rowttests(t(X[-ind,]),factor(y[-ind]))$p.val
+    ind2 = order(pvals)[1:m]
+    predict=knn(X[-ind,ind2],X[ind,ind2],y[-ind],k=k)
+    sum(predict!=y[ind])
+  })
+  sum(result)/length(y)
+  })
+min(errors)
+##make a plot and confirm its just one min:
+errors = matrix(errors,5,11)
+library(rafalib)
+mypar(1,1)
+matplot(ms,t(errors),type="l",log="x")
+legend("topright",as.character(ks),lty=seq_along(ks),col=seq_along(ks))
+```
+Note that we achieve much lower error rate when predicting date than when predicting the group. Because group is confounded with date, it is very possible that these predictors have no information about group and that our lower 0.5 error rates are due to the confounding with date. We will learn more about this in the batch effects section.
+
+
+
